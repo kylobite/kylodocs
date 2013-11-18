@@ -1,4 +1,4 @@
-KyloDocs<br>Version 1.0.0
+KyloDocs<br>Version 1.1.0
 
 KyloDocs is a simple NoSQL utility for Ruby that attempts to make database management easier for you by making language do all the guess work for you.
 
