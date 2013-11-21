@@ -28,7 +28,7 @@ class KyloDocs
             @data = Hash.new
             @base = File.expand_path File.dirname __FILE__
 
-            @path ||= search base
+            @path ||= locate base
             @dir    = "#{@path}/#{file}"
 
             if not File.exists? "#{@dir}.json" then create end
@@ -51,7 +51,7 @@ class KyloDocs
 
     # Look for the `memories` folder
     # This is so YOU can be lazy
-    def search(start)
+    def locate(start)
         contents = Dir.entries start
         2.times { contents.shift }
 
@@ -67,7 +67,7 @@ class KyloDocs
         contents.each do |c|
             if File.directory? c then
                 # Recursion!!!
-                search c
+                locate c
             end
         end
 
@@ -145,6 +145,38 @@ class KyloDocs
             return unserialize contents
         end
         return String.new
+    end
+
+    # Query for terms in database
+    ## terms = [index to look at, what value should be]
+    ## grab  = what data you want from a match
+    ## path  = where to look for index
+    def search(terms, grab, path = nil)
+        hash = read()
+        keys = [@file] | path.split("/")
+        output = nil
+        look, expect = terms[0], terms[1]
+
+        keys.inject(hash, :fetch)[look].each do |h|
+            if h[look] == expect then output = h[grab] end
+            break if !output.nil?
+        end
+        return (output.nil?) ? nil : output
+    end
+
+    # Reverse search; same as DESC
+    def reverse(terms, grab, path = nil)
+        hash = read()
+        keys = [@file] | path.split("/")
+        output = nil
+        look, expect = terms[0], terms[1]
+
+        # Reverse aspect
+        Hash[keys.inject(hash, :fetch)[look].to_a.reverse].each do |h|
+            if h[look] == expect then output = h[grab] end
+            break if !output.nil?
+        end
+        return (output.nil?) ? nil : output
     end
 
     def update_mode(mode, hash, keys)
