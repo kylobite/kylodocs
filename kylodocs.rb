@@ -4,7 +4,7 @@
 
 Developer:  Kylobite
 Purpose:    Ruby port of KyloDocs
-Version:    1.0
+Version:    1.1.2
 KyloDocs:   https://github.com/kylobite/kylodocs
 
 =end
@@ -28,10 +28,11 @@ class KyloDocs
             @data = Hash.new
             @base = File.expand_path File.dirname __FILE__
 
+            @path = path
             @path ||= locate base
-            @dir    = "#{@path}/#{file}"
+            @dir  = "#{@path}/#{file}"
 
-            if not File.exists? "#{@dir}.json" then create end
+            if not File.exists? "#{@dir}" then create end
         end
     end
 
@@ -73,7 +74,7 @@ class KyloDocs
 
         # Please, never be this lazy
         FileUtils.mkpath("memories") unless Dir.exist? "memories"
-        return "#{@base}/#{memories}"
+        return "#{@base}/#{@memories}"
     end
 
     # This is the magic behind the `update` function
@@ -133,11 +134,11 @@ class KyloDocs
     end
 
     def create()
-        File.open("#{@dir}.json", File::RDWR|File::CREAT, 0644) { |file| file.write({"#{@file}"=>{}}.to_json) }
+        File.open("#{@dir}", File::RDWR|File::CREAT, 0644) { |file| file.write({"#{@file}"=>{}}.to_json) }
     end
 
     def read(string = false)
-        contents = File.open("#{@dir}.json") { |file| file.read }
+        contents = File.open("#{@dir}") { |file| file.read }
 
         if string then
             return serialize contents
@@ -151,31 +152,47 @@ class KyloDocs
     ## terms = [index to look at, what value should be]
     ## grab  = what data you want from a match
     ## path  = where to look for index
-    def search(terms, grab, path = nil)
+    ## vague = check exact or close to
+    def search(terms, grab, path = nil, vague = false)
         hash = read()
         keys = [@file] | path.split("/")
         output = nil
         look, expect = terms[0], terms[1]
 
-        keys.inject(hash, :fetch)[look].each do |h|
-            if h[look] == expect then output = h[grab] end
+        get = nil
+        get ||= keys.inject(hash, :fetch)[look]
+
+        get.each do |h|
+            if vague then
+                if h[look] =~ expect then output = h[grab] end
+            else
+                if h[look] == expect then output = h[grab] end
+            end
             break if !output.nil?
-        end
+        end unless not exists get
         return (output.nil?) ? nil : output
     end
 
     # Reverse search; same as DESC
-    def reverse(terms, grab, path = nil)
+    def rsearch(terms, grab, path = nil, vague = false)
         hash = read()
         keys = [@file] | path.split("/")
         output = nil
         look, expect = terms[0], terms[1]
 
+        # Please do not let this happen
+        check = exists Hash[keys.inject(hash, :fetch)[look].to_a.reverse]
+        get = check ? Hash[keys.inject(hash, :fetch)[look].to_a.reverse] : nil
+
         # Reverse aspect
-        Hash[keys.inject(hash, :fetch)[look].to_a.reverse].each do |h|
-            if h[look] == expect then output = h[grab] end
+        get.each do |h|
+            if vague then
+                if h[look] =~ expect then output = h[grab] end
+            else
+                if h[look] == expect then output = h[grab] end
+            end
             break if !output.nil?
-        end
+        end unless not exists get
         return (output.nil?) ? nil : output
     end
 
@@ -190,8 +207,9 @@ class KyloDocs
 
     # I advice only doing this with a `new-array` combo
     def update(path = nil, mode = "default")
-        hash = JSON.parse(File.open("#{@dir}.json") { |file| file.read })
-        keys = [@file] | path.split("/") unless not exists path or path == "*"
+        hash = JSON.parse(File.open("#{@dir}") { |file| file.read })
+        keys = [@file]
+        keys = keys | path.split("/") unless not exists path or path == "*"
 
         priority_mode = Array.new
         # Is there more than one mode given?
@@ -215,8 +233,8 @@ class KyloDocs
         string  = hash.to_json.encode("UTF-8")
         tmp = Tempfile.new "tmp"
         tmp.write(string)
-        FileUtils.mv(tmp.path, "#{@dir}.json")
-        db = File.open("#{@dir}.json", File::RDWR|File::CREAT, 0644)
+        FileUtils.mv(tmp.path, "#{@dir}")
+        db = File.open("#{@dir}", File::RDWR|File::CREAT, 0644)
         db.flock(File::LOCK_EX)
         tmp.close
         tmp.unlink
@@ -226,7 +244,7 @@ class KyloDocs
     end
 
     def delete(verify = false)
-        if verify then File.delete("#{@dir}.json") end
+        if verify then File.delete("#{@dir}") end
     end
 end
 
